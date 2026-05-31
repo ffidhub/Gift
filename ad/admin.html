@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Location Tracker</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Supabase Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+
+    /* Login Screen */
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .login-box {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      padding: 3rem;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-box h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #aaa;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      background: rgba(255,255,255,0.2);
+      box-shadow: 0 0 0 2px #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error-message {
+      background: rgba(231, 76, 60, 0.2);
+      color: #e74c3c;
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    /* Dashboard */
+    .dashboard {
+      display: none;
+    }
+
+    .dashboard.show {
+      display: block;
+    }
+
+    .header {
+      background: rgba(255,255,255,0.05);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logout-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #aaa;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: rgba(231, 76, 60, 0.2);
+      border-color: #e74c3c;
+      color: #e74c3c;
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 0;
+      height: calc(100vh - 70px);
+    }
+
+    .map-container {
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .sidebar {
+      background: rgba(255,255,255,0.05);
+      border-left: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar-header h2 {
+      font-size: 1rem;
+      color: #aaa;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      padding: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.05);
+      padding: 1rem;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-card .label {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-top: 0.25rem;
+    }
+
+    .location-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .location-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .location-list::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .location-list::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+
+    .location-item {
+      background: rgba(255,255,255,0.05);
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .location-item:hover {
+      background: rgba(255,255,255,0.1);
+      transform: translateX(5px);
+    }
+
+    .location-item .time {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-bottom: 0.25rem;
+    }
+
+    .location-item .coords {
+      font-size: 0.9rem;
+      color: #667eea;
+    }
+
+    .location-item .device {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 0.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #666;
+    }
+
+    .empty-state .icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .realtime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(46, 213, 115, 0.2);
+      color: #2ed573;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+    }
+
+    .realtime-badge .dot {
+      width: 8px;
+      height: 8px;
+      background: #2ed573;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Leaflet popup styling */
+    .leaflet-popup-content-wrapper {
+      background: #1a1a2e;
+      color: #eee;
+      border-radius: 10px;
+    }
+
+    .leaflet-popup-tip {
+      background: #1a1a2e;
+    }
+
+    .popup-content {
+      padding: 0.5rem;
+    }
+
+    .popup-content h3 {
+      margin-bottom: 0.5rem;
+      color: #667eea;
+    }
+
+    .popup-content p {
+      margin: 0.25rem 0;
+      font-size: 0.9rem;
+    }
+
+    .popup-content .label {
+      color: #888;
+    }
+
+    /* Loading state */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(26, 26, 46, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+
+    .loading-overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 300px;
+      }
+
+      .sidebar {
+        border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.1);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="login-container" id="loginScreen">
+    <div class="login-box">
+      <h1>🗺️ Location Tracker</h1>
+      <div class="error-message" id="loginError"></div>
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="admin@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginBtn">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <div class="header">
+      <h1>📍 Location Tracker</h1>
+      <div class="header-actions">
+        <div class="realtime-badge">
+          <span class="dot"></span>
+          Live Updates
+        </div>
+        <button class="btn btn-secondary" onclick="exportToCSV()">📥 Export CSV</button>
+        <div class="user-info">
+          <span id="userEmail">admin@example.com</span>
+          <button class="logout-btn" onclick="handleLogout()">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h2>📊 Statistics</h2>
+        </div>
+        <div class="stats">
+          <div class="stat-card">
+            <div class="value" id="totalLocations">0</div>
+            <div class="label">Total Locations</div>
+          </div>
+          <div class="stat-card">
+            <div class="value" id="avgAccuracy">--</div>
+            <div class="label">Avg Accuracy (m)</div>
+          </div>
+        </div>
+        <div class="sidebar-header">
+          <h2>📍 Recent Locations</h2>
+        </div>
+        <div class="location-list" id="locationList">
+          <div class="empty-state">
+            <div class="icon">📍</div>
+            <p>No locations yet</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // ============================================
+    // CONFIGURATION - Replace with your values
+    // ============================================
+    const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+    // Initialize Supabase client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Global variables
+    let map;
+    let markers = [];
+    let locations = [];
+    let realtimeSubscription = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        showDashboard(session.user);
+        initializeMap();
+        fetchLocations();
+        subscribeToRealtime();
+      } else {
+        showLogin();
+      }
+
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          showDashboard(session.user);
+          initializeMap();
+          fetchLocations();
+          subscribeToRealtime();
+        } else if (event === 'SIGNED_OUT') {
+          showLogin();
+          cleanupDashboard();
+        }
+      });
+    });
+
+    function showLogin() {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('dashboard').classList.remove('show');
+    }
+
+    function showDashboard(user) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboard').classList.add('show');
+      document.getElementById('userEmail').textContent = user.email;
+    }
+
+    function cleanupDashboard() {
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe();
+        realtimeSubscription = null;
+      }
+      if (map) {
+        map.remove();
+        map = null;
+      }
+      markers = [];
+      locations = [];
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const loginBtn = document.getElementById('loginBtn');
+      const errorEl = document.getElementById('loginError');
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+      errorEl.classList.remove('show');
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.add('show');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+      }
+    }
+
+    async function handleLogout() {
+      await supabase.auth.signOut();
+    }
+
+    function initializeMap() {
+      // Initialize Leaflet map
+      map = L.map('map').setView([20, 0], 2);
+
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+    }
+
+    async function fetchLocations() {
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      loadingOverlay.classList.add('show');
+
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      loadingOverlay.classList.remove('show');
+
+      if (error) {
+        console.error('Error fetching locations:', error);
+        return;
+      }
+
+      locations = data || [];
+      updateMapMarkers();
+      updateLocationList();
+      updateStats();
+    }
+
+    function updateMapMarkers() {
+      // Clear existing markers
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+
+      // Add new markers
+      locations.forEach((loc, index) => {
+        const color = index === 0 ? '#2ed573' : '#667eea';
+        
+        const marker = L.marker([loc.latitude, loc.longitude], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          })
+        });
+
+        const popupContent = `
+          <div class="popup-content">
+            <h3>Location #${locations.length - index}</h3>
+            <p><span class="label">Lat:</span> ${loc.latitude.toFixed(6)}</p>
+            <p><span class="label">Lng:</span> ${loc.longitude.toFixed(6)}</p>
+            <p><span class="label">Accuracy:</span> ${loc.accuracy ? loc.accuracy.toFixed(0) + 'm' : 'N/A'}</p>
+            <p><span class="label">Time:</span> ${formatDate(loc.created_at)}</p>
+            ${loc.ip_address ? `<p><span class="label">IP:</span> ${loc.ip_address}</p>` : ''}
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+        marker.addTo(map);
+        markers.push(marker);
+      });
+
+      // Fit map to show all markers
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
+    }
+
+    function updateLocationList() {
+      const listEl = document.getElementById('locationList');
+
+      if (locations.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📍</div>
+            <p>No locations yet</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = locations.slice(0, 50).map((loc, index) => `
+        <div class="location-item" onclick="focusLocation(${index})">
+          <div class="time">${formatDate(loc.created_at)}</div>
+          <div class="coords">${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}</div>
+          ${loc.device_info ? `<div class="device">${loc.device_info.platform || 'Unknown device'}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function updateStats() {
+      document.getElementById('totalLocations').textContent = locations.length;
+      
+      if (locations.length > 0) {
+        const accuracies = locations.map(l => l.accuracy).filter(a => a);
+        if (accuracies.length > 0) {
+          const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
+          document.getElementById('avgAccuracy').textContent = Math.round(avg);
+        }
+      }
+    }
+
+    function focusLocation(index) {
+      const loc = locations[index];
+      
+      // Pan map to location
+      map.setView([loc.latitude, loc.longitude], 14);
+      
+      // Open popup
+      markers[index].openPopup();
+    }
+
+    function subscribeToRealtime() {
+      realtimeSubscription = supabase
+        .channel('locations')
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'locations' },
+          (payload) => {
+            console.log('New location received:', payload.new);
+            
+            // Add to beginning of array
+            locations.unshift(payload.new);
+            
+            // Update UI
+            updateMapMarkers();
+            updateLocationList();
+            updateStats();
+          }
+        )
+        .subscribe();
+    }
+
+    function exportToCSV() {
+      if (locations.length === 0) {
+        alert('No locations to export');
+        return;
+      }
+
+      // Create CSV header
+      const headers = ['ID', 'Created At', 'Latitude', 'Longitude', 'Accuracy (m)', 'IP Address', 'User Agent', 'Device Info'];
+      
+      // Create CSV rows
+      const rows = locations.map(loc => [
+        loc.id,
+        loc.created_at,
+        loc.latitude,
+        loc.longitude,
+        loc.accuracy || '',
+        loc.ip_address || '',
+        loc.user_agent || '',
+        JSON.stringify(loc.device_info) || ''
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `locations_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now - date;
+      
+      // Less than 1 minute
+      if (diff < 60000) {
+        return 'Just now';
+      }
+      
+      // Less than 1 hour
+      if (diff < 3600000) {
+        const mins = Math.floor(diff / 60000);
+        return `${mins}m ago`;
+      }
+      
+      // Less than 24 hours
+      if (diff < 86400000) {
+        const hours = Math.floor(diff / 3600000);
+        return `${hours}h ago`;
+      }
+      
+      // Format as date
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  </script>
+</body>
+</html>
